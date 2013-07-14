@@ -53,7 +53,7 @@ func (self *pooledConn) Write(b []byte) (n int, err error) {
 func (self *pooledConn) Close() error {
 	err := self.conn.Close()
 	self.setErr(err)
-	return
+	return err
 }
 
 func (self *pooledConn) LocalAddr() net.Addr {
@@ -67,17 +67,17 @@ func (self *pooledConn) RemoteAddr() net.Addr {
 func (self *pooledConn) SetDeadline(t time.Time) error {
 	err := self.conn.SetDeadline(t)
 	self.setErr(err)
-	return
+	return err
 }
 
 func (self *pooledConn) SetReadDeadline(t time.Time) error {
 	err := self.conn.SetReadDeadline(t)
 	self.setErr(err)
-	return
+	return err
 }
 
 func (self *pooledConn) SetWriteDeadline(t time.Time) error {
 	err := self.conn.SetWriteDeadline(t)
 	self.setErr(err)
-	return
+	return err
 }
