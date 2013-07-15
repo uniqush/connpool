@@ -358,7 +358,7 @@ func TestConcurrentAccess(t *testing.T) {
 			if c == nil {
 				t.Errorf("nil conn")
 			}
-			us := rand.Intn(30)
+			us := rand.Intn(30) + 1
 			time.Sleep(time.Duration(us) * time.Microsecond)
 			c.Close()
 		}()

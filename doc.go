@@ -15,7 +15,7 @@
  *
  */
 
-// This is an extremely simple implementation of connection pool.
+// This is a simple implementation of connection pool.
 // Thanks for the concurrent facilities provided by Go, the implementation
 // is very easy and clear.
 //
