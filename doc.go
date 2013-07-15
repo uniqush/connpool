@@ -16,16 +16,17 @@
  */
 
 // This is a simple implementation of connection pool.
-// Thanks for the concurrent facilities provided by Go, the implementation
-// is very easy and clear.
 //
-// First, user need to implement the ConnManager interface so that
+// First, the user needs to implement the ConnManager interface so that
 // the pool can know how to create a connection and how to initialize
 // a connection.
 //
-// After that, simply use Get() function to get an initialized connection.
+// After that, simply use ``Get()`` function to get an initialized connection.
+// The connection will be initiallized by the ``InitConn()``
+// method provided by the ``ConnManager``.
 //
-// Once finished, the connection will be returned to the pool on the call of Close().
+// For each connection allocated from the pool, the user *must* call ``Close()``
+// in the end, otherwise the connection will not be returned back to the pool.
 //
 // Example:
 //
