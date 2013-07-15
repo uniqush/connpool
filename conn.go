@@ -54,7 +54,7 @@ func (self *pooledConn) Write(b []byte) (n int, err error) {
 func (self *pooledConn) Close() error {
 	req := &freeRequest{self}
 	self.pool.freeChan <- req
-	return err
+	return nil
 }
 
 func (self *pooledConn) LocalAddr() net.Addr {

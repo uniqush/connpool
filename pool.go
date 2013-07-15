@@ -188,3 +188,15 @@ func (self *Pool) processRequest(start chan bool) {
 		}
 	}
 }
+
+func (self *Pool) Get() (conn net.Conn, err error) {
+	connCh := make(chan *pooledConn)
+	errCh := make(chan error)
+	req := &allocRequest{connCh, errCh}
+	self.allocChan <- req
+	select {
+	case conn = <-connCh:
+	case err = <-errCh:
+	}
+	return
+}
