@@ -18,8 +18,11 @@
 package connpool
 
 import (
+	"errors"
 	"net"
 )
+
+var ErrUnavailable = errors.New("the pool is no longer avaialbe")
 
 type allocRequest struct {
 	connChan chan<- *pooledConn
@@ -58,6 +61,10 @@ func NewPool(maxNrConn, maxNrIdle int, mngr ConnManager) *Pool {
 
 	ret.allocChan = make(chan *allocRequest)
 	ret.freeChan = make(chan *freeRequest)
+
+	ch := make(chan bool)
+	go ret.processRequest(ch)
+	ch <- true
 	return ret
 }
 
@@ -102,7 +109,9 @@ func (self *Pool) createConn() (conn *pooledConn, err error) {
 
 func (self *Pool) dropConn(conn *pooledConn) {
 	conn.conn.Close()
-	self.nrActiveConn--
+	if conn.pool == self {
+		self.nrActiveConn--
+	}
 }
 
 func (self *Pool) dequeueAllocRequest() *allocRequest {
@@ -187,6 +196,19 @@ func (self *Pool) processRequest(start chan bool) {
 			self.free(freq)
 		}
 	}
+
+	for r := self.dequeueAllocRequest(); r != nil; r = self.dequeueAllocRequest() {
+		r.errChan <- ErrUnavailable
+	}
+
+	for conn := self.popIdle(); conn != nil; conn = self.popIdle() {
+		self.dropConn(conn)
+	}
+}
+
+func (self *Pool) Close() {
+	close(self.allocChan)
+	close(self.freeChan)
 }
 
 func (self *Pool) Get() (conn net.Conn, err error) {
