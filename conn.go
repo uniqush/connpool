@@ -31,8 +31,7 @@ type pooledConn struct {
 // Set the error if the error is not recoverable.
 func (self *pooledConn) setErr(err error) {
 	if err != nil {
-		nerr, ok := err.(net.Error)
-		if ok && nerr.Temporary() {
+		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
 			return
 		}
 		self.err = err
