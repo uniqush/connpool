@@ -339,7 +339,7 @@ func TestGetFromIdleList(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 	max := 10
-	nrProcs := 100
+	nrProcs := 1000
 	manager := &fakeConnManager{nil, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
