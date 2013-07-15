@@ -49,6 +49,13 @@ type Pool struct {
 	freeChan     chan *freeRequest
 }
 
+// Create a new connection pool, which will never create more than
+// maxNrConn connections and will always maintain less than maxNrIdle
+// idle connections.
+//
+// If maxNrIdle <= 0 means there is no limit on max number of idle connections.
+//
+// If maxNrConn <= means there is no limit on max number of connections.
 func NewPool(maxNrConn, maxNrIdle int, mngr ConnManager) *Pool {
 	ret := new(Pool)
 	ret.manager = mngr
@@ -86,7 +93,7 @@ func (self *Pool) pushIdle(conn *pooledConn) {
 	if conn.err != nil {
 		return
 	}
-	if len(self.idle) >= self.maxNrIdle {
+	if len(self.idle) >= self.maxNrIdle && self.maxNrIdle > 0 {
 		self.dropConn(conn)
 	} else {
 		self.idle = append(self.idle, conn)
@@ -95,7 +102,7 @@ func (self *Pool) pushIdle(conn *pooledConn) {
 }
 
 func (self *Pool) createConn() (conn *pooledConn, err error) {
-	if self.maxNrConn <= self.nrActiveConn+len(self.idle) {
+	if self.maxNrConn <= 0 || self.maxNrConn <= self.nrActiveConn+len(self.idle) {
 		return nil, nil
 	}
 	c, err := self.manager.NewConn()
@@ -211,6 +218,8 @@ func (self *Pool) Close() {
 	close(self.freeChan)
 }
 
+// Get a connection. The function will block the goroutine until there is
+// a connection available or an error occured.
 func (self *Pool) Get() (conn net.Conn, err error) {
 	connCh := make(chan *pooledConn)
 	errCh := make(chan error)
