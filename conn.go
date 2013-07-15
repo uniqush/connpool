@@ -25,6 +25,7 @@ import (
 type pooledConn struct {
 	conn net.Conn
 	err  error
+	pool *Pool
 }
 
 // Set the error if the error is not recoverable.
