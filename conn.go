@@ -52,8 +52,8 @@ func (self *pooledConn) Write(b []byte) (n int, err error) {
 }
 
 func (self *pooledConn) Close() error {
-	err := self.conn.Close()
-	self.setErr(err)
+	req := &freeRequest{self}
+	self.pool.freeChan <- req
 	return err
 }
 

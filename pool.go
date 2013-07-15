@@ -42,14 +42,11 @@ type Pool struct {
 	idle         []*pooledConn
 	reqQueue     []*allocRequest
 	manager      ConnManager
-	allocChan    <-chan *allocRequest
-	freeChan     <-chan *freeRequest
+	allocChan    chan *allocRequest
+	freeChan     chan *freeRequest
 }
 
-func newPoolProcessor(maxNrConn, maxNrIdle int,
-	mngr ConnManager,
-	allocChan <-chan *allocRequest,
-	freeChan <-chan *freeRequest) *Pool {
+func newPoolProcessor(maxNrConn, maxNrIdle int, mngr ConnManager) *Pool {
 	ret := new(Pool)
 	ret.manager = mngr
 	ret.nrActiveConn = 0
@@ -59,8 +56,8 @@ func newPoolProcessor(maxNrConn, maxNrIdle int,
 	ret.idle = make([]*pooledConn, 0, maxNrIdle)
 	ret.reqQueue = make([]*allocRequest, 0, 1024)
 
-	ret.allocChan = allocChan
-	ret.freeChan = freeChan
+	ret.allocChan = make(chan *allocRequest)
+	ret.freeChan = make(chan *freeRequest)
 	return ret
 }
 
