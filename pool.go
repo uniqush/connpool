@@ -53,9 +53,9 @@ type Pool struct {
 // maxNrConn connections and will always maintain less than maxNrIdle
 // idle connections.
 //
-// If maxNrIdle <= 0 means there is no limit on max number of idle connections.
+// maxNrIdle <= 0 means there is no limit on max number of idle connections.
 //
-// If maxNrConn <= means there is no limit on max number of connections.
+// maxNrConn <= means there is no limit on max number of connections.
 func NewPool(maxNrConn, maxNrIdle int, mngr ConnManager) *Pool {
 	ret := new(Pool)
 	ret.manager = mngr
