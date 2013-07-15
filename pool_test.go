@@ -18,6 +18,7 @@
 package connpool
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -166,6 +167,57 @@ func TestPushPopIdleOutOfRange(t *testing.T) {
 	if len(pool.idle) != max {
 		t.Errorf("idle list length is %v, should be %v!",
 			len(pool.idle), max)
+		return
+	}
+}
+
+func integrityTest(pool *Pool, maxIdle, maxConn int) error {
+	if len(pool.idle) > maxIdle {
+		return fmt.Errorf("len(idle) > maxIdle: %v > %v", len(pool.idle), maxIdle)
+	}
+	if len(pool.idle)+pool.nrActiveConn > maxConn {
+		return fmt.Errorf("len(idle)+nrActiveConn > maxCOnn: %v+%v > %v", len(pool.idle), pool.nrActiveConn, maxConn)
+	}
+	return nil
+}
+
+func TestGetConnWithinRange(t *testing.T) {
+	N := 10
+	max := 10
+	manager := &fakeConnManager{nil, nil}
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+	connList := make([]net.Conn, 0, N)
+	for i := 0; i < N; i++ {
+		conn, err := pool.Get()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		connList = append(connList, conn)
+	}
+	if pool.nrActiveConn != max {
+		t.Errorf("#. Active Connections is %v (should be %v)",
+			pool.nrActiveConn, max)
+		return
+	}
+	err := integrityTest(pool, N, N)
+	if err != nil {
+		t.Errorf("Pool is corrupted: %v\n", err)
+		return
+	}
+
+	for _, conn := range connList {
+		conn.Close()
+	}
+
+	if len(pool.idle) != max {
+		t.Errorf("idle list length is %v; should be %v", len(pool.idle), max)
+		return
+	}
+	err = integrityTest(pool, N, N)
+	if err != nil {
+		t.Errorf("Pool is corrupted: %v\n", err)
 		return
 	}
 }
