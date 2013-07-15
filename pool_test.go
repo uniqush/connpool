@@ -313,11 +313,25 @@ func TestGetFromIdleList(t *testing.T) {
 		return
 	}
 
-	conn.Close()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
 
-	conn, err = pool.Get()
-	if err != nil {
-		fmt.Errorf("Error: %v", err)
-		return
-	}
+	go func() {
+		defer wg.Done()
+		c, err := pool.Get()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		if c == nil {
+			t.Errorf("nil conn")
+		}
+	}()
+
+	// Wait for a while, so that the
+	// other goroutine have to wait on Get()
+	// (let its request enqueue)
+	time.Sleep(1 * time.Second)
+	conn.Close()
+	wg.Wait()
 }
