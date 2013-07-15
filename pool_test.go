@@ -19,6 +19,7 @@ package connpool
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"testing"
@@ -333,5 +334,34 @@ func TestGetFromIdleList(t *testing.T) {
 	// (let its request enqueue)
 	time.Sleep(1 * time.Second)
 	conn.Close()
+	wg.Wait()
+}
+
+func TestConcurrentAccess(t *testing.T) {
+	max := 10
+	nrProcs := 100
+	manager := &fakeConnManager{nil, nil}
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+
+	wg := new(sync.WaitGroup)
+	wg.Add(nrProcs)
+
+	for i := 0; i < nrProcs; i++ {
+		go func() {
+			defer wg.Done()
+			c, err := pool.Get()
+			if err != nil {
+				t.Errorf("Error: %v", err)
+				return
+			}
+			if c == nil {
+				t.Errorf("nil conn")
+			}
+			us := rand.Intn(30)
+			time.Sleep(time.Duration(us) * time.Microsecond)
+			c.Close()
+		}()
+	}
 	wg.Wait()
 }
