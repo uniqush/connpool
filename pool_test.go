@@ -20,6 +20,7 @@ package connpool
 import (
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -220,4 +221,51 @@ func TestGetConnWithinRange(t *testing.T) {
 		t.Errorf("Pool is corrupted: %v\n", err)
 		return
 	}
+}
+
+func TestGetConnOutOfRange(t *testing.T) {
+	N := 10
+	max := 8
+	manager := &fakeConnManager{nil, nil}
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+	connList := make([]net.Conn, 0, N)
+	for i := 0; i < max; i++ {
+		conn, err := pool.Get()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		connList = append(connList, conn)
+	}
+	if pool.nrActiveConn != max {
+		t.Errorf("#. Active Connections is %v (should be %v)",
+			pool.nrActiveConn, max)
+		return
+	}
+
+	err := integrityTest(pool, N, N)
+	if err != nil {
+		t.Errorf("Pool is corrupted: %v\n", err)
+		return
+	}
+
+	wg := new(sync.WaitGroup)
+	wg.Add(N - max)
+
+	for i := max; i < N; i++ {
+		go func() {
+			_, err := pool.Get()
+			if err != nil {
+				t.Errorf("Error: %v", err)
+				return
+			}
+			wg.Done()
+		}()
+	}
+
+	for _, conn := range connList {
+		conn.Close()
+	}
+	wg.Wait()
 }
