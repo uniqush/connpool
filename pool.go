@@ -46,7 +46,7 @@ type Pool struct {
 	freeChan     chan *freeRequest
 }
 
-func newPoolProcessor(maxNrConn, maxNrIdle int, mngr ConnManager) *Pool {
+func NewPool(maxNrConn, maxNrIdle int, mngr ConnManager) *Pool {
 	ret := new(Pool)
 	ret.manager = mngr
 	ret.nrActiveConn = 0
