@@ -19,6 +19,7 @@ package connpool
 
 import (
 	"errors"
+	"fmt"
 	"net"
 )
 
@@ -47,6 +48,25 @@ type Pool struct {
 	manager      ConnManager
 	allocChan    chan *allocRequest
 	freeChan     chan *freeRequest
+}
+
+func printIndent(level int) {
+	for i := 0; i < level; i++ {
+		fmt.Printf("\t")
+	}
+}
+
+func (self *Pool) debug(indentLevel int) {
+	printIndent(indentLevel)
+	fmt.Printf("maxNrIdle: %v\n", self.maxNrIdle)
+	printIndent(indentLevel)
+	fmt.Printf("maxNrConn: %v\n", self.maxNrConn)
+	printIndent(indentLevel)
+	fmt.Printf("nrActiveConn: %v\n", self.nrActiveConn)
+	printIndent(indentLevel)
+	fmt.Printf("idle length: %v\n", len(self.idle))
+	printIndent(indentLevel)
+	fmt.Printf("req queue length: %v\n", len(self.reqQueue))
 }
 
 // Create a new connection pool, which will never create more than
@@ -102,7 +122,7 @@ func (self *Pool) pushIdle(conn *pooledConn) {
 }
 
 func (self *Pool) createConn() (conn *pooledConn, err error) {
-	if self.maxNrConn <= 0 || self.maxNrConn <= self.nrActiveConn+len(self.idle) {
+	if self.maxNrConn > 0 && self.maxNrConn <= self.nrActiveConn+len(self.idle) {
 		return nil, nil
 	}
 	c, err := self.manager.NewConn()
@@ -144,6 +164,12 @@ func (self *Pool) alloc(req *allocRequest) {
 			req.errChan <- err
 			return
 		}
+
+		// We cannot create more connections
+		if conn == nil {
+			self.reqQueue = append(self.reqQueue, req)
+			return
+		}
 	}
 
 	err = self.manager.InitConn(conn)
@@ -152,11 +178,7 @@ func (self *Pool) alloc(req *allocRequest) {
 		req.errChan <- err
 		return
 	}
-	if conn == nil {
-		self.reqQueue = append(self.reqQueue, req)
-	} else {
-		req.connChan <- conn
-	}
+	req.connChan <- conn
 	return
 }
 
@@ -177,7 +199,9 @@ func (self *Pool) free(req *freeRequest) {
 	if conn != nil {
 		self.pushIdle(conn)
 	}
-	for self.nrActiveConn+len(self.idle) < self.maxNrConn {
+	// As long as we have (potential) available connections...
+	for len(self.idle) > 0 || self.nrActiveConn+len(self.idle) < self.maxNrConn {
+		// pass the connection to the first one waiting in the queue.
 		if r := self.dequeueAllocRequest(); r != nil {
 			self.alloc(r)
 		} else {

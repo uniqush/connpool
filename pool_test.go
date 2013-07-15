@@ -90,6 +90,11 @@ func TestPushPopIdleWithinRange(t *testing.T) {
 	connList := make([]*pooledConn, 0, N)
 	for i := 0; i < N; i++ {
 		conn, _ := pool.createConn()
+		if conn == nil {
+			t.Errorf("Got nil conn")
+			pool.debug(1)
+			return
+		}
 		connList = append(connList, conn)
 	}
 
@@ -224,8 +229,8 @@ func TestGetConnWithinRange(t *testing.T) {
 }
 
 func TestGetConnOutOfRange(t *testing.T) {
-	N := 10
-	max := 8
+	N := 5
+	max := 3
 	manager := &fakeConnManager{nil, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
@@ -234,6 +239,10 @@ func TestGetConnOutOfRange(t *testing.T) {
 		conn, err := pool.Get()
 		if err != nil {
 			t.Errorf("Error: %v", err)
+			return
+		}
+		if conn == nil {
+			t.Errorf("nil conn")
 			return
 		}
 		connList = append(connList, conn)
@@ -255,9 +264,13 @@ func TestGetConnOutOfRange(t *testing.T) {
 
 	for i := max; i < N; i++ {
 		go func() {
-			_, err := pool.Get()
+			conn, err := pool.Get()
 			if err != nil {
 				t.Errorf("Error: %v", err)
+				return
+			}
+			if conn == nil {
+				t.Errorf("nil conn")
 				return
 			}
 			wg.Done()
@@ -268,4 +281,43 @@ func TestGetConnOutOfRange(t *testing.T) {
 		conn.Close()
 	}
 	wg.Wait()
+}
+
+func TestGetWithError(t *testing.T) {
+	max := 8
+	errSomeError := fmt.Errorf("shit happens")
+	manager := &fakeConnManager{errSomeError, nil}
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+
+	_, err := pool.Get()
+	if err != errSomeError {
+		fmt.Errorf("shit really happens")
+	}
+}
+
+func TestGetFromIdleList(t *testing.T) {
+	max := 1
+	manager := &fakeConnManager{nil, nil}
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+
+	conn, err := pool.Get()
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	if conn == nil {
+		t.Errorf("nil conn")
+		return
+	}
+
+	conn.Close()
+
+	conn, err = pool.Get()
+	if err != nil {
+		fmt.Errorf("Error: %v", err)
+		return
+	}
 }
