@@ -31,14 +31,14 @@
 // Example:
 //
 // 	type ServerConnManager struct {
-// 		addr string
+// 		addr   string
 // 	}
 //
 // 	func (self *ServerConnManager) NewConn() (conn net.Conn, err error) {
 // 		return net.Dial("tcp", self.addr)
 // 	}
 //
-// 	func (self *ServerConnManager) InitConn(conn net.Conn) error {
+// 	func (self *ServerConnManager) InitConn(conn net.Conn, n int) error {
 // 		_, err := conn.Write([]byte("IDLE"))
 // 		return err
 // 	}

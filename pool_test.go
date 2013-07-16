@@ -79,7 +79,7 @@ func (self *fakeConnManager) NewConn() (conn net.Conn, err error) {
 	return &fakeConn{self.connErr}, nil
 }
 
-func (self *fakeConnManager) InitConn(conn net.Conn) error {
+func (self *fakeConnManager) InitConn(conn net.Conn, n int) error {
 	return self.err
 }
 
@@ -163,7 +163,7 @@ func TestPushPopIdleOutOfRange(t *testing.T) {
 		conn := connList[i]
 		if conn == nil {
 			c := &fakeConn{nil}
-			conn = &pooledConn{c, nil, nil}
+			conn = &pooledConn{c, nil, nil, 0}
 		}
 		pool.pushIdle(conn)
 	}

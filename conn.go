@@ -26,6 +26,7 @@ type pooledConn struct {
 	conn net.Conn
 	err  error
 	pool *Pool
+	n    int
 }
 
 // Set the error if the error is not recoverable.
@@ -53,6 +54,7 @@ func (self *pooledConn) Write(b []byte) (n int, err error) {
 func (self *pooledConn) Close() error {
 	req := &freeRequest{self}
 	self.pool.freeChan <- req
+	self.n++
 	return nil
 }
 

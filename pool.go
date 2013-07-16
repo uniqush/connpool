@@ -35,8 +35,21 @@ type freeRequest struct {
 }
 
 type ConnManager interface {
+	// Used to create a new connection.
+	// It will be called if there is no enough connection
+	// ans there is still space to allocate new connections.
 	NewConn() (net.Conn, error)
-	InitConn(conn net.Conn) error
+
+	// This method will be called when the user
+	// use Pool.Get() to get a connection.
+	// Every connection returned from Get() will
+	// be initialized with this method.
+	//
+	// conn is the connection, which will be returned.
+	//
+	// n is the number of times this connection has been used.
+	// n = 0 means the connection is newly created.
+	InitConn(conn net.Conn, n int) error
 }
 
 type Pool struct {
@@ -129,7 +142,7 @@ func (self *Pool) createConn() (conn *pooledConn, err error) {
 	if err != nil {
 		return
 	}
-	conn = &pooledConn{c, nil, self}
+	conn = &pooledConn{c, nil, self, 0}
 	self.nrActiveConn++
 	return
 }
@@ -172,7 +185,7 @@ func (self *Pool) alloc(req *allocRequest) {
 		}
 	}
 
-	err = self.manager.InitConn(conn)
+	err = self.manager.InitConn(conn, conn.n)
 	if err != nil {
 		self.dropConn(conn)
 		req.errChan <- err

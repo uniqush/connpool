@@ -26,7 +26,7 @@ Example:
 		return net.Dial("tcp", self.addr)
 	}
 
-	func (self *ServerConnManager) InitConn(conn net.Conn) error {
+	func (self *ServerConnManager) InitConn(conn net.Conn, n int) error {
 		_, err := conn.Write([]byte("IDLE"))
 		return err
 	}
