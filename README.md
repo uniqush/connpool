@@ -3,6 +3,8 @@ connpool
 
 Network connection pool in Go.
 
+[![Build Status](https://travis-ci.org/uniqush/connpool.png?branch=master)](https://travis-ci.org/uniqush/connpool)
+
 This is a simple implementation of connection pool.
 
 First, the user needs to implement the ``ConnManager`` interface so that
