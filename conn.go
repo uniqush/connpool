@@ -53,8 +53,8 @@ func (self *pooledConn) Write(b []byte) (n int, err error) {
 
 func (self *pooledConn) Close() error {
 	req := &freeRequest{self}
-	self.pool.freeChan <- req
 	self.n++
+	self.pool.freeChan <- req
 	return nil
 }
 
