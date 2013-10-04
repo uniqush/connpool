@@ -365,3 +365,22 @@ func TestConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestCloseConnAfterClosingPool(t *testing.T) {
+	max := 10
+	manager := &fakeConnManager{nil, nil}
+	pool := NewPool(max, max, manager)
+	c, err := pool.Get()
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+
+	if c == nil {
+		t.Errorf("nil conn")
+	}
+	// Close the pool first.
+	pool.Close()
+
+	// Then close the connection
+	c.Close()
+}

@@ -52,6 +52,15 @@ func (self *pooledConn) Write(b []byte) (n int, err error) {
 }
 
 func (self *pooledConn) Close() error {
+	defer func() {
+		if r := recover(); r != nil {
+			// this will be true if
+			// self.pool.freeChan
+			// is closed.
+			// i.e. the pool is closed
+			self.conn.Close()
+		}
+	}()
 	req := &freeRequest{self}
 	self.n++
 	self.pool.freeChan <- req

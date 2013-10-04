@@ -257,6 +257,7 @@ func (self *Pool) Close() {
 
 // Get a connection. The function will block the goroutine until there is
 // a connection available or an error occured.
+// Calling Get() on a closed pool will lead to panic.
 func (self *Pool) Get() (conn net.Conn, err error) {
 	connCh := make(chan *pooledConn)
 	errCh := make(chan error)
