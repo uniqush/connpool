@@ -19,18 +19,38 @@ package connpool
 
 import (
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type pooledConn struct {
-	conn net.Conn
-	err  error
-	pool *Pool
-	n    int
+	conn    net.Conn
+	errLock sync.RWMutex
+	err     error
+	pool    *Pool
+	n       int32
+}
+
+func (self *pooledConn) nrReuse() int {
+	return int(atomic.LoadInt32(&self.n))
+}
+
+func (self *pooledConn) getErr() error {
+	self.errLock.RLock()
+	defer self.errLock.RUnlock()
+
+	return self.err
 }
 
 // Set the error if the error is not recoverable.
 func (self *pooledConn) setErr(err error) {
+	self.errLock.Lock()
+	defer self.errLock.Unlock()
+
+	if self.err != nil {
+		return
+	}
 	if err != nil {
 		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
 			return
@@ -62,7 +82,7 @@ func (self *pooledConn) Close() error {
 		}
 	}()
 	req := &freeRequest{self}
-	self.n++
+	atomic.AddInt32(&self.n, 1)
 	self.pool.freeChan <- req
 	return nil
 }

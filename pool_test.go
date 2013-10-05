@@ -163,7 +163,12 @@ func TestPushPopIdleOutOfRange(t *testing.T) {
 		conn := connList[i]
 		if conn == nil {
 			c := &fakeConn{nil}
-			conn = &pooledConn{c, nil, nil, 0}
+			conn = &pooledConn{
+				conn: c,
+				err:  nil,
+				pool: nil,
+				n:    0,
+			}
 		}
 		pool.pushIdle(conn)
 	}
@@ -383,4 +388,36 @@ func TestCloseConnAfterClosingPool(t *testing.T) {
 
 	// Then close the connection
 	c.Close()
+}
+
+func TestConcurrentWrite(t *testing.T) {
+	max := 10
+	nrProcs := 10
+	errSomeError := fmt.Errorf("shit happens")
+	manager := &fakeConnManager{nil, errSomeError}
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+	c, err := pool.Get()
+	defer c.Close()
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	if c == nil {
+		t.Errorf("nil conn")
+		return
+	}
+
+	wg := new(sync.WaitGroup)
+	wg.Add(nrProcs)
+
+	for i := 0; i < nrProcs; i++ {
+		go func() {
+			defer wg.Done()
+			c.Write([]byte("hello"))
+		}()
+	}
+	wg.Wait()
+
 }

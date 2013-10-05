@@ -123,7 +123,7 @@ func (self *Pool) pushIdle(conn *pooledConn) {
 	if conn == nil {
 		return
 	}
-	if conn.err != nil {
+	if conn.getErr() != nil {
 		return
 	}
 	if len(self.idle) >= self.maxNrIdle && self.maxNrIdle > 0 {
@@ -142,7 +142,12 @@ func (self *Pool) createConn() (conn *pooledConn, err error) {
 	if err != nil {
 		return
 	}
-	conn = &pooledConn{c, nil, self, 0}
+	conn = &pooledConn{
+		conn: c,
+		err:  nil,
+		pool: self,
+		n:    0,
+	}
 	self.nrActiveConn++
 	return
 }
@@ -185,7 +190,7 @@ func (self *Pool) alloc(req *allocRequest) {
 		}
 	}
 
-	err = self.manager.InitConn(conn, conn.n)
+	err = self.manager.InitConn(conn, conn.nrReuse())
 	if err != nil {
 		self.dropConn(conn)
 		req.errChan <- err
@@ -203,7 +208,7 @@ func (self *Pool) free(req *freeRequest) {
 	if conn == nil {
 		return
 	}
-	if conn.err != nil {
+	if conn.getErr() != nil {
 		// This connection encuntered an
 		// unrecoverable error
 		self.dropConn(conn)
