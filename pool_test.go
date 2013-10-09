@@ -19,6 +19,7 @@ package connpool
 
 import (
 	"fmt"
+
 	"math/rand"
 	"net"
 	"sync"
@@ -27,7 +28,8 @@ import (
 )
 
 type fakeConn struct {
-	err error
+	err       error
+	closeChan chan<- bool
 }
 
 func (self *fakeConn) Read(b []byte) (n int, err error) {
@@ -45,6 +47,9 @@ func (self *fakeConn) Write(b []byte) (n int, err error) {
 }
 
 func (self *fakeConn) Close() error {
+	if self.closeChan != nil {
+		self.closeChan <- true
+	}
 	return nil
 }
 
@@ -68,15 +73,16 @@ func (self *fakeConn) SetWriteDeadline(t time.Time) error {
 }
 
 type fakeConnManager struct {
-	err     error
-	connErr error
+	err       error
+	connErr   error
+	closeChan chan<- bool
 }
 
 func (self *fakeConnManager) NewConn() (conn net.Conn, err error) {
 	if self.err != nil {
 		return nil, self.err
 	}
-	return &fakeConn{self.connErr}, nil
+	return &fakeConn{err: self.connErr, closeChan: self.closeChan}, nil
 }
 
 func (self *fakeConnManager) InitConn(conn net.Conn, n int) error {
@@ -86,7 +92,7 @@ func (self *fakeConnManager) InitConn(conn net.Conn, n int) error {
 func TestPushPopIdleWithinRange(t *testing.T) {
 	N := 10
 	mid := 5
-	manager := &fakeConnManager{nil, nil}
+	manager := &fakeConnManager{nil, nil, nil}
 	pool := NewPool(N, N, manager)
 	connList := make([]*pooledConn, 0, N)
 	for i := 0; i < N; i++ {
@@ -140,7 +146,7 @@ func TestPushPopIdleWithinRange(t *testing.T) {
 func TestPushPopIdleOutOfRange(t *testing.T) {
 	N := 10
 	max := 8
-	manager := &fakeConnManager{nil, nil}
+	manager := &fakeConnManager{nil, nil, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
 	connList := make([]*pooledConn, 0, N)
@@ -162,7 +168,7 @@ func TestPushPopIdleOutOfRange(t *testing.T) {
 	for i := 0; i < N; i++ {
 		conn := connList[i]
 		if conn == nil {
-			c := &fakeConn{nil}
+			c := &fakeConn{}
 			conn = &pooledConn{
 				conn: c,
 				err:  nil,
@@ -196,7 +202,7 @@ func integrityTest(pool *Pool, maxIdle, maxConn int) error {
 func TestGetConnWithinRange(t *testing.T) {
 	N := 10
 	max := 10
-	manager := &fakeConnManager{nil, nil}
+	manager := &fakeConnManager{nil, nil, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
 	connList := make([]net.Conn, 0, N)
@@ -237,7 +243,7 @@ func TestGetConnWithinRange(t *testing.T) {
 func TestGetConnOutOfRange(t *testing.T) {
 	N := 5
 	max := 3
-	manager := &fakeConnManager{nil, nil}
+	manager := &fakeConnManager{nil, nil, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
 	connList := make([]net.Conn, 0, N)
@@ -292,7 +298,7 @@ func TestGetConnOutOfRange(t *testing.T) {
 func TestGetWithError(t *testing.T) {
 	max := 8
 	errSomeError := fmt.Errorf("shit happens")
-	manager := &fakeConnManager{errSomeError, nil}
+	manager := &fakeConnManager{errSomeError, nil, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
 
@@ -304,7 +310,7 @@ func TestGetWithError(t *testing.T) {
 
 func TestGetFromIdleList(t *testing.T) {
 	max := 1
-	manager := &fakeConnManager{nil, nil}
+	manager := &fakeConnManager{nil, nil, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
 
@@ -345,7 +351,7 @@ func TestGetFromIdleList(t *testing.T) {
 func TestConcurrentAccess(t *testing.T) {
 	max := 10
 	nrProcs := 1000
-	manager := &fakeConnManager{nil, nil}
+	manager := &fakeConnManager{nil, nil, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
 
@@ -373,7 +379,7 @@ func TestConcurrentAccess(t *testing.T) {
 
 func TestCloseConnAfterClosingPool(t *testing.T) {
 	max := 10
-	manager := &fakeConnManager{nil, nil}
+	manager := &fakeConnManager{nil, nil, nil}
 	pool := NewPool(max, max, manager)
 	c, err := pool.Get()
 	if err != nil {
@@ -390,11 +396,11 @@ func TestCloseConnAfterClosingPool(t *testing.T) {
 	c.Close()
 }
 
-func TestConcurrentWrite(t *testing.T) {
+func TestConcurrentWriteWithError(t *testing.T) {
 	max := 10
 	nrProcs := 10
 	errSomeError := fmt.Errorf("shit happens")
-	manager := &fakeConnManager{nil, errSomeError}
+	manager := &fakeConnManager{nil, errSomeError, nil}
 	pool := NewPool(max, max, manager)
 	defer pool.Close()
 	c, err := pool.Get()
@@ -420,4 +426,37 @@ func TestConcurrentWrite(t *testing.T) {
 	}
 	wg.Wait()
 
+}
+
+func TestTemporaryError(t *testing.T) {
+	max := 10
+	// Create some temporary error
+	errSomeError := &net.DNSError{
+		IsTimeout: true,
+	}
+	ch := make(chan bool)
+	manager := &fakeConnManager{nil, errSomeError, ch}
+	// By default, we do not accept temporary error
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+	c, err := pool.Get()
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	if c == nil {
+		t.Errorf("nil conn")
+		return
+	}
+
+	_, err = c.Write([]byte("hello"))
+
+	if err == nil {
+		t.Errorf("Error: There should be some error!")
+		return
+	}
+
+	c.Close()
+	<-ch
 }

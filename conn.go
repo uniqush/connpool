@@ -43,17 +43,22 @@ func (self *pooledConn) getErr() error {
 	return self.err
 }
 
+func (self *pooledConn) clrErr() {
+	self.errLock.Lock()
+	defer self.errLock.Unlock()
+	self.err = nil
+}
+
 // Set the error if the error is not recoverable.
 func (self *pooledConn) setErr(err error) {
 	self.errLock.Lock()
 	defer self.errLock.Unlock()
 
-	if self.err != nil {
-		return
-	}
 	if err != nil {
-		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-			return
+		if self.err != nil {
+			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+				return
+			}
 		}
 		self.err = err
 	}

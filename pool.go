@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync/atomic"
 )
 
 var ErrUnavailable = errors.New("the pool is no longer avaialbe")
@@ -61,6 +62,8 @@ type Pool struct {
 	manager      ConnManager
 	allocChan    chan *allocRequest
 	freeChan     chan *freeRequest
+
+	acceptTempError int32
 }
 
 func printIndent(level int) {
@@ -123,7 +126,18 @@ func (self *Pool) pushIdle(conn *pooledConn) {
 	if conn == nil {
 		return
 	}
-	if conn.getErr() != nil {
+	err := conn.getErr()
+	if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+		if atomic.LoadInt32(&self.acceptTempError) != 0 {
+			// It's a temporary error and we accept temporary error. Clear it.
+			conn.clrErr()
+			err = nil
+		}
+	}
+
+	if err != nil {
+		// In this case, this error is not acceptable.
+		self.dropConn(conn)
 		return
 	}
 	if len(self.idle) >= self.maxNrIdle && self.maxNrIdle > 0 {
@@ -208,12 +222,6 @@ func (self *Pool) free(req *freeRequest) {
 	if conn == nil {
 		return
 	}
-	if conn.getErr() != nil {
-		// This connection encuntered an
-		// unrecoverable error
-		self.dropConn(conn)
-		conn = nil
-	}
 	if conn != nil {
 		self.pushIdle(conn)
 	}
@@ -273,4 +281,14 @@ func (self *Pool) Get() (conn net.Conn, err error) {
 	case err = <-errCh:
 	}
 	return
+}
+
+// If this is set to true, then a connection will be reused if it has a temporary error.
+// Otherwise, the connection will be dropped on a temporary error.
+func (self *Pool) ShouldAcceptTempError(yes bool) {
+	if yes {
+		atomic.StoreInt32(&self.acceptTempError, 1)
+	} else {
+		atomic.StoreInt32(&self.acceptTempError, 0)
+	}
 }
