@@ -62,6 +62,7 @@ type Pool struct {
 	manager      ConnManager
 	allocChan    chan *allocRequest
 	freeChan     chan *freeRequest
+	nextConnId   uint64
 
 	acceptTempError int32
 }
@@ -143,6 +144,11 @@ func (self *Pool) pushIdle(conn *pooledConn) {
 	if len(self.idle) >= self.maxNrIdle && self.maxNrIdle > 0 {
 		self.dropConn(conn)
 	} else {
+		for _, c := range self.idle {
+			if c.id == conn.id {
+				return
+			}
+		}
 		self.idle = append(self.idle, conn)
 		self.nrActiveConn--
 	}
@@ -161,8 +167,10 @@ func (self *Pool) createConn() (conn *pooledConn, err error) {
 		err:  nil,
 		pool: self,
 		n:    0,
+		id:   self.nextConnId,
 	}
 	self.nrActiveConn++
+	self.nextConnId++
 	return
 }
 

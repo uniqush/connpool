@@ -30,6 +30,7 @@ type pooledConn struct {
 	err     error
 	pool    *Pool
 	n       int32
+	id      uint64
 }
 
 func (self *pooledConn) nrReuse() int {

@@ -460,3 +460,28 @@ func TestTemporaryError(t *testing.T) {
 	c.Close()
 	<-ch
 }
+
+func TestDoubleClose(t *testing.T) {
+	max := 10
+	manager := &fakeConnManager{nil, nil, nil}
+	// By default, we do not accept temporary error
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+	c, err := pool.Get()
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	if c == nil {
+		t.Errorf("nil conn")
+		return
+	}
+
+	c.Close()
+	c.Close()
+
+	if pool.nrActiveConn < 0 {
+		t.Errorf("Error: Nr active connections is %v\n", pool.nrActiveConn)
+	}
+}
