@@ -25,12 +25,13 @@ import (
 )
 
 type pooledConn struct {
-	conn    net.Conn
-	errLock sync.RWMutex
-	err     error
-	pool    *Pool
-	n       int32
-	id      uint64
+	conn      net.Conn
+	errLock   sync.RWMutex
+	err       error
+	pool      *Pool
+	n         int32
+	id        uint64
+	timestamp time.Time
 }
 
 func (self *pooledConn) nrReuse() int {

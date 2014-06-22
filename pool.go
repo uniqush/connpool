@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"sync/atomic"
+	"time"
 )
 
 var ErrUnavailable = errors.New("the pool is no longer avaialbe")
@@ -113,14 +114,20 @@ func NewPool(maxNrConn, maxNrIdle int, mngr ConnManager) *Pool {
 }
 
 func (self *Pool) popIdle() *pooledConn {
-	if len(self.idle) == 0 {
-		return nil
+
+	for len(self.idle) > 0 {
+		conn := self.idle[len(self.idle)-1]
+		self.idle[len(self.idle)-1] = nil
+		self.idle = self.idle[:len(self.idle)-1]
+		// Ignore any connection which is in idle state more than 15
+		// min.
+		if time.Now().Sub(conn.timestamp) > 15*time.Minute {
+			continue
+		}
+		self.nrActiveConn++
+		return conn
 	}
-	conn := self.idle[len(self.idle)-1]
-	self.idle[len(self.idle)-1] = nil
-	self.idle = self.idle[:len(self.idle)-1]
-	self.nrActiveConn++
-	return conn
+	return nil
 }
 
 func (self *Pool) pushIdle(conn *pooledConn) {
@@ -163,11 +170,12 @@ func (self *Pool) createConn() (conn *pooledConn, err error) {
 		return
 	}
 	conn = &pooledConn{
-		conn: c,
-		err:  nil,
-		pool: self,
-		n:    0,
-		id:   self.nextConnId,
+		conn:      c,
+		err:       nil,
+		pool:      self,
+		n:         0,
+		id:        self.nextConnId,
+		timestamp: time.Now(),
 	}
 	self.nrActiveConn++
 	self.nextConnId++
