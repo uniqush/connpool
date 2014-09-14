@@ -485,3 +485,32 @@ func TestDoubleClose(t *testing.T) {
 		t.Errorf("Error: Nr active connections is %v\n", pool.nrActiveConn)
 	}
 }
+
+func TestMoreConn(t *testing.T) {
+	max := 10
+	manager := &fakeConnManager{nil, nil, nil}
+	// By default, we do not accept temporary error
+	pool := NewPool(max, max, manager)
+	defer pool.Close()
+
+	for i := 0; i < max; i++ {
+		_, err := pool.Get()
+		if err != nil {
+			t.Fatalf("Error: %v", err)
+			return
+		}
+	}
+	ch := make(chan bool)
+
+	go func() {
+		_, err := pool.Get()
+		t.Errorf("Error: %v", err)
+		<-ch
+	}()
+
+	select {
+	case <-ch:
+		t.Errorf("Wrong!")
+	case <-time.After(1 * time.Second):
+	}
+}
