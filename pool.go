@@ -122,6 +122,7 @@ func (self *Pool) popIdle() *pooledConn {
 		// Ignore any connection which is in idle state more than 15
 		// min.
 		if time.Now().Sub(conn.timestamp) > 15*time.Minute {
+			self.dropConn(conn)
 			continue
 		}
 		self.nrActiveConn++
